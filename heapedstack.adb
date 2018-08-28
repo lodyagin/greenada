@@ -9,8 +9,12 @@ package body GreenAda.HeapedStack is
       Old_Local_Address: Address_Type := Stack.Local_Pointer;
       Old_Global_Address: Address_Type;
    begin
-      
       -- Does it fit into the current block?
+      if Size_Left_In_Current_Block(Stack) >= Size then
+	 Stack.Local_Pointer := @ - Size;
+      else
+	 
+      
       
       -- if the next block exists 
       -- then
