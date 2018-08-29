@@ -3,7 +3,7 @@ package body Green_Ada.Heaped_Stack is
    package body Sizes is
       
       --  We use these predefined sizes. The idea is to have a limited
-      --  set of sizes to make memory fragmentation as little as
+      --  set of sizes to keep memory fragmentation as little as
       --  possible.  The minimal frame size is 40 bytes. It is to use
       --  not more than 25% for control information (the size of
       --  Stack_Type is 10 bytes). On 128G+ RAM computer we can create
@@ -16,10 +16,10 @@ package body Green_Ada.Heaped_Stack is
       --  step=16 to specify possible predefined frame sizes in the
       --  range 128+..256. And so on. We think it is crazy to have
       --  more than 64K of stack per task - this limitation of course
-      --  also serves the purpose of having the control block overhead
-      --  as little as possible. That also means that for tasks with
+      --  also serves the purpose of having the control block 
+      --  as small as possible. That also means that for tasks with
       --  32K+ stack we use step of 4K (because we can't have many of
-      --  them and wasting of 4095 bytes per each should not be a
+      --  them and wasting of 4105 bytes per each should not be a
       --  problem).
       
       Predefined_Frame_Sizes_Array is array Index_Type of Size_Type;
@@ -102,11 +102,8 @@ package body Green_Ada.Heaped_Stack is
       -- (memory access is suboptimal on modern CPUs)
       function Size(Index: in Index_Type) return Size_Type 
       is
-	 Up_To_Power: Integer range 7..16;
-	 Step_Size: Integer range 8..4096;
-	 Step_Number: Integer range 0..15;
       begin
-	 Up_To_Power := Index 
+	 return Predefined_Frame_Sizes(Index);
       end Size;
    end Sizes;
    
