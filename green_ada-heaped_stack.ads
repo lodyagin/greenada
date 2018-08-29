@@ -6,7 +6,7 @@ package Green_Ada.Heaped_Stack is
       type Index_Type is Integer range 0..84;
       
       -- We assume a frame size is limited by 64K
-      type Size_Type is Integer range 0..65535;
+      type Size_Type is Integer range 0..65536;
       
       -- Size to index
       function Index(Size: in Size_Type) return Index_Type;
