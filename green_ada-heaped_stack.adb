@@ -15,7 +15,7 @@ package body Green_Ada.Heaped_Stack is
       --  limited by 10^11 on the same architecture, that's why we use
       --  step=16 to specify possible predefined frame sizes in the
       --  range 128+..256. And so on. We think it is crazy to have
-      --  more than 64K of stack per task - this limitation of course
+      --  more than 65535 of stack per task - this limitation of course
       --  also serves the purpose of having the control block 
       --  as small as possible. That also means that for tasks with
       --  32K+ stack we use step of 4K (because we can't have many of
@@ -66,9 +66,9 @@ package body Green_Ada.Heaped_Stack is
 	 16384+2048,    16384+2*2048,  16384+3*2048,  16384+4*2048,  
 	 16384+5*2048,  16384+6*2048,  16384+7*2048,  16384+8*2048,
 	 
-	 -- 32K+4K .. 64K
+	 -- 32K+4K .. 64K-1
 	 32768+4096,    32768+2*4096,  32768+3*4096,  32768+4*4096,  
-	 32768+5*4096,  32768+6*4096,  32768+7*4096,  32768+8*4096
+	 32768+5*4096,  32768+6*4096,  32768+7*4096,  65535
       );
 	 
       
