@@ -2,29 +2,39 @@ package body Green_Ada.Heaped_Stack is
    
    package body Sizes is
       
-      --  We use these predefined sizes. The idea is to have a limited
-      --  set of sizes to keep memory fragmentation as little as
-      --  possible.  The minimal frame size is 40 bytes. It is to use
-      --  not more than 25% for control information (the size of
-      --  Stack_Type is 10 bytes). On 128G+ RAM computer we can create
-      --  10^12 of tasks with frames in range 40..128 bytes with
-      --  maximal overhead 17G (size of Block_Header_Type + step(=8
-      --  bytes) -1 ).  It is obvious that if we want to have 10^12
-      --  tasks they should be optimized for stack usage. So, tasks
-      --  which uses more than 128 bytes of stack are expected to be
-      --  limited by 10^11 on the same architecture, that's why we use
-      --  step=16 to specify possible predefined frame sizes in the
-      --  range 128+..256. And so on. We think it is crazy to have
-      --  more than 64K-10 of stack per task - this limitation of course
-      --  also serves the purpose of having the control block 
-      --  as small as possible. That also means that for tasks with
-      --  32K+ stack we use step of 4K (because we can't have many of
-      --  them and wasting of 4105 bytes per each should not be a
-      --  problem).
+      --  We use these predefined sizes. The idea is to have a
+      --  limited set of sizes to keep memory fragmentation as
+      --  little as possible.  The minimal frame size is 40
+      --  bytes. It is to use not more than 25% for control
+      --  information (the size of Stack_Type is 10 bytes). On
+      --  128G+ RAM computer we can create 10^12 of tasks with
+      --  frames in range 40..128 bytes with maximal overhead
+      --  17G (size of Block_Header_Type + step(=8 bytes) -1
+      --  ).  It is obvious that if we want to have 10^12
+      --  tasks they should be optimized for stack usage. So,
+      --  tasks which uses more than 128 bytes of stack are
+      --  expected to be limited by 10^11 on the same
+      --  architecture, that's why we use step=16 to specify
+      --  possible predefined frame sizes in the range
+      --  128+..256. And so on. We think it is crazy to have
+      --  more than 512K-10 of stack per task - this limitation
+      --  of course also serves the purpose of having the
+      --  control block as small as possible. That also means
+      --  that for tasks with 256K+ stack we use step of 32K
+      --  (because we can't have many of them and wasting of
+      --  32779 bytes per each should not be a problem).
       
-      Predefined_Frame_Sizes_Array is array Index_Type of Size_Type;
+      Predefined_Frame_Sizes_Array is 
+        array Index_Type of Size_Type;
       
-      Predefined_Frame_Sizes: constant Predefined_Frame_Sizes_Array :=
+      N16K: constant := 16384;
+      N32K: constant := N16K * 2;
+      N64K: constant := N32K * 2;
+      N128K: constant := N64K * 2;
+      N256K: constant := N128K * 2;
+      
+      Predefined_Frame_Sizes: constant 
+        Predefined_Frame_Sizes_Array :=
 	(
 	 -- no value
 	 0,
@@ -63,12 +73,24 @@ package body Green_Ada.Heaped_Stack is
 	 8192+5*1024,  8192+6*1024,  8192+7*1024,  8192+8*1024,
 	 
 	 -- 16K+2K .. 32K
-	 16384+2048,    16384+2*2048,  16384+3*2048,  16384+4*2048,  
-	 16384+5*2048,  16384+6*2048,  16384+7*2048,  16384+8*2048,
+	 16384+2048,   16384+2*2048, 16384+3*2048, 16384+4*2048,
+	 16384+5*2048, 16384+6*2048, 16384+7*2048, 16384+8*2048,
 	 
 	 -- 32K+4K .. 64K
-	 32768+4096,    32768+2*4096,  32768+3*4096,  32768+4*4096,  
-	 32768+5*4096,  32768+6*4096,  32768+7*4096,  32768+8*4096
+	 32768+4096,   32768+2*4096, 32768+3*4096, 32768+4*4096,
+	 32768+5*4096, 32768+6*4096, 32768+7*4096, 32768+8*4096,
+         
+	 -- 64K+8K .. 128K
+	 65536+8192,   65536+2*8192, 65536+3*8192, 65536+4*8192,
+	 65536+5*8192, 65536+6*8192, 65536+7*8192, 65536+8*8192,
+         
+	 -- 128K+16K .. 256K
+	 N128K+N16K,   N128K+2*N16K, N128K+3*N16K, N128K+4*N16K,
+	 N128K+5*N16K, N128K+6*N16K, N128K+7*N16K, N128K+8*N16K,
+         
+	 -- 256K+32K .. 512K
+	 N256K+N32K,   N256K+2*N32K, N256K+3*N32K, N256K+4*N32K,
+	 N256K+5*N32K, N256K+6*N32K, N256K+7*N32K, N256K+8*N32K
       );
 	 
       
@@ -95,11 +117,12 @@ package body Green_Ada.Heaped_Stack is
 	 return Min((Up_To_Power - 6) * 16 + Step_Number - 4, 0);
       end Index;
 	
-      -- Index to size.
-      -- This implementation is ready only for the purposes of testing/logging, 
-      -- because array indexing should never be
-      -- used during highly optimized program execution 
-      -- (memory access is suboptimal on modern CPUs)
+      --  Index to size.
+      --
+      --  This implementation is ready only for the purposes of
+      --  testing/logging, because array indexing should never
+      --  be used during highly optimized program execution
+      --  (memory access is suboptimal on modern CPUs)
       function Size(Index: in Index_Type) return Size_Type 
       is
       begin
@@ -115,32 +138,49 @@ package body Green_Ada.Heaped_Stack is
       -- if the next frame was allocated already
       if Stack.Local_Pointer.Next /= null
       then
-	 -- and the size of it is enough (dynamic structs don't consume more)
-	 if Size > Stack.Local_Pointer.Next.Size
-         then -- it is not enough
-	    -- put the next frame into the free frames list
-	    Collect_Free_Block(Stack.Free_Blocks.all, Stack.Local_Pointer.Next);
+         declare
+            Next_Block_Size: constant Sizes.Size_Type 
+              := Size(Stack.Local_Pointer.Next.all);
+         begin
+            --  and the size of it is enough (dynamic structs
+            --  don't consume more) and not less than the half of
+            --  the previous size of the frame
+            if Size > Next_Block_Size
+              or else Size < Next_Block_Size / 2
+            then -- it is not enough
+                 -- put the next frame into the free frames list
+               Collect_Free_Block
+                 (Stack.Free_Blocks.all, 
+                  Stack.Local_Pointer.Next);
 	    
-	    declare
-	       Size_Index: constant Sizes.Index_Type := Sizes.Index(Size);
-	    begin
-	       -- we need a new frame
-	       Stack.Local_Pointer.Next := Get_Free_Block(Stack.Free_Blocks, Size_Index);
-	       if Stack.Local_Pointer.Next = null
-	       then
-		  -- there is no frame of this size, allocate a new one
-		  Stack.Local_Pointer.Next 
-		    := Allocate_New_Frame(Stack.Global_Pointer'Access, Size);
-	       end if;
-	    end;
-	    -- connect the new frame
-	    Stack.Local_Pointer.Next.Prev := Stack.Local_Pointer;
-	    Stack.Local_Pointer.Next.Next := null;
-         end if;
+               declare
+                  Size_Index: constant Sizes.Index_Type 
+                    := Sizes.Index(Size);
+               begin
+                  -- we need a new frame
+                  Stack.Local_Pointer.Next 
+                    := Get_Free_Block(Stack.Free_Blocks, 
+                                      Size_Index);
+                  if Stack.Local_Pointer.Next = null
+                  then
+                     -- there is no frame of this size,
+                     --  allocate a new one
+                     Stack.Local_Pointer.Next 
+                       := Allocate_New_Frame
+                       (Stack.Global_Pointer'Access, Size);
+                  end if;
+               end;
+               
+               -- connect the new frame
+               Stack.Local_Pointer.Next.Prev 
+                 := Stack.Local_Pointer;
+               Stack.Local_Pointer.Next.Next := null;
+            end if;
+         end;
       end if;
       
-      -- Assertion: Stack.Local_Pointer.Next points to the next frame with enough space
-      --            and Next/Prev are valid
+      -- Assertion: Stack.Local_Pointer.Next points to the
+      --  next frame with enough space and Next/Prev are valid
       
       -- move the stack pointer
       Stack.Local_Pointer := Stack.Local_Pointer.Next;

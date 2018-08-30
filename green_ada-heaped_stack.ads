@@ -2,7 +2,8 @@ package Green_Ada.Heaped_Stack is
    
    package Sizes is
       
-      -- We use 84 predefined sizes, 1..84. 0 means "not definet"
+      -- We use 84 predefined sizes, 1..84. 0 means "not
+      --  defined"
       type Index_Type is new Integer range 0..84;
       
       -- We assume a frame size is limited by 64K * 8
@@ -18,7 +19,16 @@ package Green_Ada.Heaped_Stack is
       -- Index to size
       function Size(Index: in Index_Type) return Size_Type;
       
-      function Two_Bytes_Size(Size: in Size_Type) return Two_Bytes_Size_Type := (Size / 8 - 1);
+      -- Two_Bytes_Size to size
+      function Size
+        (Two_Bytes_Size: in Two_Bytes_Size_Type) 
+        return Size_Type
+        is ((Two_Bytes_Size + 1) * 8);
+      
+      function Two_Bytes_Size
+        (Size: in Size_Type) 
+        return Two_Bytes_Size_Type
+        is (Size / 8 - 1);
 	
    end Sizes;
    
@@ -29,14 +39,20 @@ package Green_Ada.Heaped_Stack is
    
    type Stack_Segment_Access is access Stack_Segment_Type;
 
-type Frame_Head_Type is 
+   type Frame_Head_Type is 
       record
          Next : Stack_Segment_Offset;
          Prev : Stack_Segment_Offset;
-         Size : Sizes.Two_Bytes_Size_Type;
+         Two_Bytes_Size : Sizes.Two_Bytes_Size_Type;
       end record;
    
-   type Size_To_Blocks_Type is array Index_Type of Frame_Head_Access;
+   function Size
+     (Frame_Head: in Frame_Head_Type) 
+     return Sizes.Size_Type
+   is (Size(Frame_Head.Two_Bytes_Size));
+   
+   type Size_To_Blocks_Type is 
+     array Index_Type of Frame_Head_Access;
    
    type Stack_Type is
       record
@@ -49,11 +65,15 @@ type Frame_Head_Type is
    -- FIXME: guarantee the size of Stack_Type record = 10 bytes
    
    -- Gets a new frame. 
+   --
    -- The frame address will be places into Stack.Local_Pointer
-   procedure Reserve_Frame(Stack: in out Stack_Type; Size: in Sizes.Size_Type);
+   procedure Reserve_Frame
+     (Stack: in out Stack_Type; Size: in Sizes.Size_Type);
    
    -- Leaves a frame.
-   -- Stack.Local_Pointer will contain a previous frame address or null.
+   --
+   -- Stack.Local_Pointer will contain a previous frame
+   --  address or null.
    procedure Retract_Frame(Stack: in out Stack_Type);
    
 private
