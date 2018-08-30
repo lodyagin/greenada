@@ -1,31 +1,28 @@
+with Green_Ada.Bits;
+
 package body Green_Ada.Heaped_Stack is
    
    package body Sizes is
       
-      --  We use these predefined sizes. The idea is to have a
-      --  limited set of sizes to keep memory fragmentation as
-      --  little as possible.  The minimal frame size is 40
-      --  bytes. It is to use not more than 25% for control
-      --  information (the size of Stack_Type is 10 bytes). On
-      --  128G+ RAM computer we can create 10^12 of tasks with
-      --  frames in range 40..128 bytes with maximal overhead
-      --  17G (size of Block_Header_Type + step(=8 bytes) -1
-      --  ).  It is obvious that if we want to have 10^12
-      --  tasks they should be optimized for stack usage. So,
-      --  tasks which uses more than 128 bytes of stack are
-      --  expected to be limited by 10^11 on the same
-      --  architecture, that's why we use step=16 to specify
-      --  possible predefined frame sizes in the range
-      --  128+..256. And so on. We think it is crazy to have
-      --  more than 512K-10 of stack per task - this limitation
-      --  of course also serves the purpose of having the
-      --  control block as small as possible. That also means
-      --  that for tasks with 256K+ stack we use step of 32K
-      --  (because we can't have many of them and wasting of
+      --  We use these predefined sizes. The idea is to have a limited set of
+      --  sizes to keep memory fragmentation as little as possible. The minimal
+      --  frame size is 40 bytes. It is to use not more than 25% for control
+      --  information (the size of Frame.Head_Type is 10 bytes). On 128G+ RAM
+      --  computer we can create 10^12 of tasks with frames in range 40..128
+      --  bytes with maximal overhead 17G (size of Block_Header_Type + step(=8
+      --  bytes) -1 ). It is obvious that if we want to have 10^12 tasks they
+      --  should be optimized for stack usage. So, tasks which uses more than
+      --  128 bytes of stack are expected to be limited by 10^11 on the same
+      --  architecture, that's why we use step=16 to specify possible predefined
+      --  frame sizes in the range 128+..256. And so on. We think it is crazy to
+      --  have more than 512K-10 of stack per task - this limitation of course
+      --  also serves the purpose of having the control block (Frame.Head_Type)
+      --  as small as possible. That also means that for tasks with 256K+ stack
+      --  we use step of 32K (because we can't have many of them and wasting of
       --  32779 bytes per each should not be a problem).
       
-      Predefined_Frame_Sizes_Array is 
-        array Index_Type of Size_Type;
+      type Predefined_Frame_Sizes_Array is 
+        array (Index_Type) of Size_Type;
       
       N16K: constant := 16384;
       N32K: constant := N16K * 2;
@@ -91,7 +88,10 @@ package body Green_Ada.Heaped_Stack is
 	 -- 256K+32K .. 512K
 	 N256K+N32K,   N256K+2*N32K, N256K+3*N32K, N256K+4*N32K,
 	 N256K+5*N32K, N256K+6*N32K, N256K+7*N32K, N256K+8*N32K
-      );
+ );
+      
+      Min_Step : constant := 8;
+      Max_Step : constant := N32K;
 	 
       
       --  (40, 48, 56, 64, ..., 128, -- step 8 | 12
@@ -106,15 +106,17 @@ package body Green_Ada.Heaped_Stack is
       -- Size to index
       function Index(Size: in Size_Type) return Index_Type 
       is
-	 Up_To_Power: Integer range 7..16;
-	 Step_Size: Integer range 8..4096;
-	 Step_Number: Integer range 0..15;
+         subtype Power_Type is Natural range 7..19;
+--         subtype Step_Size_Type is Integer range Min_Step..Max_Step;
+         subtype Step_Number_Type is Integer range 0..15;
+         
+         Up_To_Power: constant Power_Type 
+           := Power_Type'Max(Bits.GSB1(Size_Type'Max(Size - 1, 1)), 7);
+         Step_Size_Power: constant Power_Type := Up_To_Power - 4; -- / 16
+         Step_Number: constant Step_Number_Type 
+           := (2 ** Up_To_Power - Natural(Size)) / 2 ** Step_Size_Power;
       begin
-	 
-	 Up_To_Power := Max(GSB(Max(Size - 1, 1)) + 1, 7);
-	 Step_Size := 2 ** (Up_To_Power - 4);
-	 Step_Number := (Up_To - Size) / Step_Size;
-	 return Min((Up_To_Power - 6) * 16 + Step_Number - 4, 0);
+	 return Index_Type'Min(Index_Type((Up_To_Power - 6) * 16 + Step_Number - 4), 0);
       end Index;
 	
       --  Index to size.
@@ -159,7 +161,7 @@ package body Green_Ada.Heaped_Stack is
                begin
                   -- we need a new frame
                   Stack.Local_Pointer.Next 
-                    := Get_Free_Block(Stack.Free_Blocks, 
+                    := Get_Free_Block(Stack.Free_Blocks_Array, 
                                       Size_Index);
                   if Stack.Local_Pointer.Next = null
                   then
@@ -184,12 +186,12 @@ package body Green_Ada.Heaped_Stack is
       
       -- move the stack pointer
       Stack.Local_Pointer := Stack.Local_Pointer.Next;
-   end ReserveFrame;
+   end Reserve_Frame;
    
-   procedure RetractFrame (Stack: in out Stack_Type) is
+   procedure Retract_Frame (Stack: in out Stack_Type) is
    begin
       Stack.Local_Pointer := Stack.Local_Pointer.Prev;
-   end RetractFrame;
+   end Retract_Frame;
    
    -- Makes the stack grow, allocates a new frame
    -- NB: only Size is filled (but no Prev/Next)
@@ -242,5 +244,5 @@ package body Green_Ada.Heaped_Stack is
       return Old_Block_List;
    end Get_Free_Block;
    
-end GreenAda.HeapedStack;
+end Green_Ada.Heaped_Stack;
 
